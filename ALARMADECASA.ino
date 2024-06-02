@@ -3,11 +3,11 @@
 #include <Wire.h>
 
 LiquidCrystal_I2C lcd(0x27, 16, 2);// declaro el lcd
-
-#define fotoR A1
+//Defino los componentes que use
+#define fotoR A1 
 #define buzzer 5
 #define infra 4
-
+//Declaro las columnas y filas y sus teclas
 const byte FILAS = 4;
 const byte COLUMNAS = 4;
 
@@ -23,18 +23,18 @@ char botones[FILAS][COLUMNAS] = {
 
  Keypad keypad = Keypad(makeKeymap(botones), PinF, PinC, FILAS, COLUMNAS); // declaro todo junto
  
- int ldr = 0;
- int modo= 0; //
+ int ldr = 0; //variable para el valor de la fotoresistencia
+ int modo= 0; //para cambiar en los distintos modos que hay
  String entrada; //almacena los datos
- String Contra = "6528";//contraseña
+ String Contra = "6528";//contraseña default
  bool detectado = false; // para ver si entro alguien
-
+//Las funciones armar desarmar cambiarcontraseña y repetir contraseña son para que el lcd muestre la palabra password
 void armar();
 void desarmar();
 void cambiarContra();
 void repetirContra();
-void activacion();
-void escribir(String text, int col, int fila);
+void activacion(); //activacion es para la activacion de la alarma y para poner los distintos tonos del buzzer
+void escribir(String text, int col, int fila);//para poder en una funcion mostrar la palabra con la declaracionde columnas y filas
 
 void setup() {
 
@@ -44,7 +44,7 @@ void setup() {
 
   lcd.init();
   lcd.backlight();
-  lcd.print("DESACTIVADO");
+  lcd.print("DESACTIVADO");//Mensaje inicial señala que la alarma inicia desactivada
   
   Serial.begin(9600);
 
@@ -54,7 +54,7 @@ void loop() {
 
   char key = keypad.getKey();
 
-  switch(modo) {
+  switch(modo) {//inician todos los modos de la alarma
 
     case 0: //Armar
 
