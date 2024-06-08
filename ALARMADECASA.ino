@@ -3,11 +3,12 @@
 #include <Wire.h>
 
 LiquidCrystal_I2C lcd(0x27, 16, 2);// declaro el lcd
-//Defino los componentes que use
-#define fotoR A1 
-#define buzzer 5
-#define infra 4
-//Declaro las columnas y filas y sus teclas
+
+int led1 = 5;
+int led2 = 6;
+int buzzer = 7;
+int infra = A0;
+
 const byte FILAS = 4;
 const byte COLUMNAS = 4;
 
@@ -18,54 +19,57 @@ char botones[FILAS][COLUMNAS] = {
     {'*','0','#','D'}
  };
 
- byte PinF[FILAS] = {13,12,11,10}; //pines de las filas que van al arduino
- byte PinC[COLUMNAS] = {9,8,7,6}; //pines de las columnas que van al arduino
+byte PinF[FILAS] = {13,12,11,10}; //pines de las filas que van al arduino
+byte PinC[COLUMNAS] = {9,8,7,6}; //pines de las columnas que van al arduino
 
- Keypad keypad = Keypad(makeKeymap(botones), PinF, PinC, FILAS, COLUMNAS); // declaro todo junto
+Keypad keypad = Keypad(makeKeymap(botones), PinF, PinC, FILAS, COLUMNAS); // declaro todo junto
  
- int ldr = 0; //variable para el valor de la fotoresistencia
- int modo= 0; //para cambiar en los distintos modos que hay
- String entrada; //almacena los datos
- String Contra = "6528";//contraseña default
- bool detectado = false; // para ver si entro alguien
-//Las funciones armar desarmar cambiarcontraseña y repetir contraseña son para que el lcd muestre la palabra password
-void armar();
+int modo= 0; // la variable para el menu de la alarma
+int modolcd = 0;
+String entrada; //almacena los datos
+String Contra = "6528";//contraseña
+bool detectado = false; // para ver si entro alguien
+
+//Definir funciones
+/*void armar();
 void desarmar();
 void cambiarContra();
-void repetirContra();
-void activacion(); //activacion es para la activacion de la alarma y para poner los distintos tonos del buzzer
-void escribir(String text, int col, int fila);//para poder en una funcion mostrar la palabra con la declaracionde columnas y filas
+void repetirContra();*/
+void mensaje();
+void activacion();
+void escribir(String text, int col, int fila);
 
 void setup() {
-
-  pinMode(fotoR, INPUT);
-  pinMode(buzzer, OUTPUT);
-  pinMode(infra, OUTPUT);
-
-  lcd.init();
-  lcd.backlight();
-  lcd.print("DESACTIVADO");//Mensaje inicial señala que la alarma inicia desactivada
   
+  pinMode(led1, OUTPUT);
+  pinMode(led2, OUTPUT);
+  pinMode(infra, INPUT);
+  pinMode(buzzer, OUTPUT);
+
+  lcd.init(); //inicializacion del lcd
+  lcd.backlight();
+  lcd.print("DESACTIVADO");
+
   Serial.begin(9600);
 
 }
 
 void loop() {
 
-  char key = keypad.getKey();
+  char key = keypad.getKey(); //Lee la tecla presionada 
 
-  switch(modo) {//inician todos los modos de la alarma
+  switch(modo) {
 
     case 0: //Armar
 
     if (key) {
-      entrada += key;
+      entrada += key; // Guarda la tecla en entrada
 
       if (key != 'A' and key != 'B' and key != 'C' and key != 'D') { // SON LAS TECLAS CON LOS MODOS
-        lcd.print('*');
+        lcd.print('*'); 
       }
 
-      if (key == 'B') {
+      if (key == 'B') { //Si se presiono B se borra la entrada
         lcd.clear();
         entrada = "";
       }
@@ -74,72 +78,72 @@ void loop() {
 
         entrada = entrada.substring(0, entrada.length() - 1);
 
-        if (entrada == Contra) {
+        if (entrada == Contra) { //Si lo que se introdujo es igual a la contraseña inicia la activacion
           activacion();
-          digitalWrite(4, HIGH);
+          digitalWrite(led1, HIGH);
+          digitalWrite(led2, HIGH);
           escribir("ACTIVADO", 0, 0);//escribir("ACTIVADO", 0, 0);
-          modo = 1; //activacion
+          modo = 1; //pasa al siguiente caso que seia activacion
           key = '\0';
           entrada = "";
         } else {
-          escribir("Error!", 5, 0);
+          escribir("Error!", 5, 0); //Si la contraseña no es correcta salta Error
           entrada = "";
-          tone(5, 100, 1000);
+          tone(5, 100, 1000); //Suena el buzzer
           delay(1000);
-          armar();
+          modolcd = 0;
+          mensaje(); // vuelve a pedir la contraseña
         }
       }
 
-      if (key == 'D') {
+      if (key == 'D') { //Se desactiva la alarma
         modo = 2;//inicio
         escribir("DESACTIVADO", 0, 0);
       }
     }
     break;
 
-    case 1:
+    case 1://activacion
 
     if (key) {
 
       if (key == 'A') {
         modo = 4;//desarmar
         key = '\0';
-        desarmar();
+        mensaje();
       }
     }
-
-    ldr = analogRead(fotoR);
-
-    if (ldr > 500) {
+    if (digitalRead(infra) == HIGH) { //Deteccion de movimiento
       detectado = true;
     }
 
 
-  if (detectado) {
+  if (detectado) { //Si hay movimiento suena el buzzer y avisa que se detecto algo
     tone(5, 500, 1000);
     Serial.println("detectado!");
   }
   
   break;
 
-    case 2:
+    case 2: // Desactivado
 
     if (key) {
 
-      if (key == 'A') {
+      if (key == 'A') { //vuelve al modo armar
         modo = 0; //armar
-        armar();
+        mensaje();
       }
 
-      if (key == 'C') {
-        modo = 3;//cambiar contraseña
+      if (key == 'C') { // cambio de contraseña
+        modo = 3;
         key = '\0';
-        cambiarContra();
+        modolcd = 1;
+        mensaje();
       }
     }
     break;
 
-    case 3:
+    case 3: //Cambiar contraseña
 
     if (key) {
       entrada += key;
@@ -150,30 +154,30 @@ void loop() {
         lcd.print('*');
       }
 
-      if (key == 'B') {
-        lcd.setCursor(0, 1);
-        lcd.print("                ");
-        lcd.setCursor(0, 1);
+      if (key == 'B') { //Borra la entrada
+        lcd.clear();
         entrada = "";
       }
 
-      if (key == 'A') {
+      if (key == 'A') { 
         entrada = entrada.substring(0, entrada.length() - 1);
-        if (entrada == Contra) {
-          repetirContra();
+        if (entrada == Contra) {//Verifica que la contraseña vieja sea igual a la ingresada
+          modolcd = 2;
+          mensaje(); // Pide nueva contraseña
           modo = 5; //repetir contraseña
           key = '\0';
           entrada = "";
-        } else {
+        } else { // contraseña incorrecta avisa del error y vuelve a pedir contraseña
           escribir("Error!", 5, 0);
           entrada = "";
           tone(5, 100, 1000);
           delay(1000);
-          cambiarContra();
+          modolcd = 1;
+          mensaje();
         }
       }
 
-      if (key == 'D') {
+      if (key == 'D') { //Desactiva la alarma
         modo = 2; //incio
         lcd.clear();
         lcd.print("DESACTIVADO");
@@ -195,9 +199,7 @@ void loop() {
       }
 
       if (key == 'B') {
-        lcd.setCursor(0, 1);
-        lcd.print("                ");
-        lcd.setCursor(0, 1);
+        lcd.clear();
         entrada = "";
       }
 
@@ -206,7 +208,8 @@ void loop() {
         if (entrada == Contra) {
           detectado = false;
           escribir("DESACTIVADO", 0, 0);
-          digitalWrite(4, LOW);
+          digitalWrite(led1, LOW);
+          digitalWrite(led2, LOW);
           modo = 2; //inicio
           key = '\0';
           entrada = "";
@@ -219,14 +222,15 @@ void loop() {
           entrada = "";
           tone(5, 100, 1000);
           delay(1000);
-          desarmar();
+          modolcd = 0;
+          mensaje();
         }
       }
 
     }
     break;
 
-    case 5:
+    case 5: //Repetir nueva contraseña
 
     if (key) {
       entrada += key;
@@ -246,7 +250,7 @@ void loop() {
 
       if (key == 'A') {
         entrada = entrada.substring(0, entrada.length() - 1);
-        Contra = entrada;
+        Contra = entrada; //Actualiza la contraseña
         escribir("MODIFICADO", 3, 0);
         tone(5, 300, 500);
         delay(100);
@@ -267,7 +271,7 @@ void loop() {
   
 
 
-void armar() {
+/*void armar() {
   escribir("PASSWORD", 4, 0);
   lcd.setCursor(0, 1);
 }
@@ -288,10 +292,34 @@ void cambiarContra() {
 void repetirContra() {
   escribir("NEW PASSWORD", 2, 0);
   lcd.setCursor(0, 1);
+}*/
+void mensaje(){
+
+  switch(modolcd){
+
+    case 0:
+
+    escribir("PASSWORD", 4, 0);
+    lcd.setCursor(0, 1);
+
+    break;
+
+    case 1:
+
+    escribir("OLD PASSWORD", 2, 0);
+    lcd.setCursor(0, 1);
+
+    break;
+
+    case 2:
+    escribir("NEW PASSWORD", 2, 0);
+    lcd.setCursor(0, 1);
+
+    break;
+  }
 }
 
-
-void activacion() {
+void activacion() { //Emite los tonos del buzzer y escribe en el lcd
   tone(5, 500, 1000);
   escribir("Activado en 1", 0, 0);
   delay(1500);
@@ -308,10 +336,14 @@ void activacion() {
 
 
 void escribir(String text, int col, int fila) {
-  lcd.clear();
-  lcd.setCursor(col, fila);
-  lcd.print(text);
+  lcd.clear(); //Limpia la pantalla del lcd
+  lcd.setCursor(col, fila);//posiciona el cursor
+  lcd.print(text); //Muetra el texto
 }
+
+
+  
+
 
 
   
